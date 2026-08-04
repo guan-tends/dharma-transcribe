@@ -1,0 +1,17 @@
+# Core ASR
+whisperx
+torch
+torchaudio
+
+# HuggingFace model downloads
+transformers
+huggingface-hub
+
+# LLM correction (Ollama API client)
+requests
+
+# Audio processing (whisperx dep, but explicit)
+faster-whisper
+
+# Pyannote (whisperx dep)
+pyannote-audio
