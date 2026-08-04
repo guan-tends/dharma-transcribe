@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config import (
     SOURCE_DIR, OUTPUT_DIR, MANIFEST_FILE, JSON_DIR,
-    HF_TOKEN_ENV, LLM_MODEL, OLLAMA_HOST
+    HF_TOKEN_ENV, LLM_MODEL, SYNTHETIC_API_URL
 )
 from gpu import flush_gpu, vram_free_mb, vram_total_mb
 from ingest import ingest_file, find_media_files
@@ -85,20 +85,8 @@ def process_file(media_path: Path, hf_token: str = "", skip_llm: bool = False) -
     # === STAGE 6: LLM CORRECTION ===
     if not skip_llm:
         print(f"\n[STAGE 6: LLM CORRECTION]", flush=True)
-        # Verify Ollama is running and model is available
-        try:
-            import requests
-            resp = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=5)
-            models = [m["name"] for m in resp.json().get("models", [])]
-            has_model = any(LLM_MODEL in m for m in models)
-            if has_model:
-                transcript = llm_correct_transcript(transcript)
-                stages_completed.append("llm_correct")
-            else:
-                print(f"  Model {LLM_MODEL} not found in Ollama. Skipping LLM stage.", flush=True)
-                print(f"  Available: {models}", flush=True)
-        except Exception as e:
-            print(f"  Ollama not reachable: {e}. Skipping LLM stage.", flush=True)
+        transcript = llm_correct_transcript(transcript)
+        stages_completed.append("llm_correct")
     else:
         print(f"\n[STAGE 6: LLM CORRECTION] SKIPPED", flush=True)
 
@@ -139,7 +127,7 @@ def main():
 
     print(f"Dharma Transcription Pipeline", flush=True)
     print(f"GPU: {vram_total_mb()}MB total, {vram_free_mb()}MB free", flush=True)
-    print(f"LLM: {LLM_MODEL} via {OLLAMA_HOST}", flush=True)
+    print(f"LLM: {LLM_MODEL} via Synthetic API", flush=True)
     print(f"HF Token: {'provided' if args.hf_token else 'MISSING (diarization will be skipped)'}", flush=True)
 
     # Determine input files
