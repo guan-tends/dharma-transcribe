@@ -3,3 +3,5 @@ output/wav/
 __pycache__/
 *.pyc
 .env
+output/
+tests/test_e2e_llm.py

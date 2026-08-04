@@ -4,14 +4,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from config import WHISPER_MODEL, COMPUTE_TYPE, BATCH_SIZE, DEVICE, VAD_FILTER, CONDITION_ON_PREV_TEXT
+from config import WHISPER_MODEL, COMPUTE_TYPE, BATCH_SIZE, DEVICE
 from gpu import flush_gpu, vram_free_mb
 
 
 def transcribe_audio(wav_path: str) -> Optional[dict]:
     """
     Transcribe audio file with WhisperX large-v3.
-    Returns dict with segments, language info, and word timestamps.
+    Returns dict with segments, language info.
     """
     import whisperx
 
@@ -30,14 +30,14 @@ def transcribe_audio(wav_path: str) -> Optional[dict]:
     audio = whisperx.load_audio(wav_path)
 
     # Transcribe with auto language detection
+    # WhisperX 3.8.x API: VAD is built-in, returns TranscriptionResult (TypedDict)
     result = model.transcribe(
         audio,
         batch_size=BATCH_SIZE,
         language=None,  # auto-detect
-        vad_filter=VAD_FILTER,
-        condition_on_prev_text=CONDITION_ON_PREV_TEXT,
     )
 
+    # TranscriptionResult is a TypedDict — access as dict
     language = result.get("language", "unknown")
     segments = result.get("segments", [])
 
