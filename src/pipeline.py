@@ -11,8 +11,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config import (
     SOURCE_DIR, OUTPUT_DIR, MANIFEST_FILE, JSON_DIR,
-    HF_TOKEN_ENV, LLM_MODEL, SYNTHETIC_API_URL
+    HF_TOKEN_ENV, LLM_MODEL, SYNTHETIC_API_URL, DEVICE as DEFAULT_DEVICE
 )
+import config
 from gpu import flush_gpu, vram_free_mb, vram_total_mb
 from ingest import ingest_file, find_media_files
 from transcribe import transcribe_with_metadata
@@ -123,9 +124,13 @@ def main():
     parser.add_argument("--source-dir", default=str(SOURCE_DIR), help="Source directory")
     parser.add_argument("--skip-llm", action="store_true", help="Skip LLM correction stage")
     parser.add_argument("--hf-token", default=os.environ.get(HF_TOKEN_ENV, ""), help="HuggingFace token")
+    parser.add_argument("--device", choices=["cuda", "cpu"], default=DEFAULT_DEVICE, help="Compute device: cuda (GPU) or cpu")
     args = parser.parse_args()
 
+    # Override device at runtime so all modules pick it up
+    config.DEVICE = args.device
     print(f"Dharma Transcription Pipeline", flush=True)
+    print(f"Device: {args.device}", flush=True)
     print(f"GPU: {vram_total_mb()}MB total, {vram_free_mb()}MB free", flush=True)
     print(f"LLM: {LLM_MODEL} via Synthetic API", flush=True)
     print(f"HF Token: {'provided' if args.hf_token else 'MISSING (diarization will be skipped)'}", flush=True)

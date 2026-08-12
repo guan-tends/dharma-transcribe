@@ -2,7 +2,7 @@
 from typing import Optional
 import warnings
 
-from config import ALIGN_MODELS
+from config import ALIGN_MODELS, DEVICE
 from gpu import flush_gpu, vram_free_mb
 
 
@@ -29,7 +29,7 @@ def align_transcript(transcript: dict, wav_path: str, hf_token: str = "") -> dic
     try:
         model_a, metadata = whisperx.load_align_model(
             language_code=language,
-            device="cuda",
+            device=DEVICE,
             model_name=align_model_name,
         )
     except Exception as e:
@@ -44,7 +44,7 @@ def align_transcript(transcript: dict, wav_path: str, hf_token: str = "") -> dic
             model_a,
             metadata,
             wav_path,
-            device="cuda",
+            device=DEVICE,
             return_char_alignments=False,
         )
         transcript["segments"] = result_aligned["segments"]
