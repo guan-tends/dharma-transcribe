@@ -2,7 +2,8 @@
 from typing import Optional
 import warnings
 
-from config import ALIGN_MODELS, DEVICE
+import config
+from config import ALIGN_MODELS
 from gpu import flush_gpu, vram_free_mb
 
 
@@ -29,7 +30,7 @@ def align_transcript(transcript: dict, wav_path: str, hf_token: str = "") -> dic
     try:
         model_a, metadata = whisperx.load_align_model(
             language_code=language,
-            device=DEVICE,
+            device=config.DEVICE,
             model_name=align_model_name,
         )
     except Exception as e:
@@ -44,7 +45,7 @@ def align_transcript(transcript: dict, wav_path: str, hf_token: str = "") -> dic
             model_a,
             metadata,
             wav_path,
-            device=DEVICE,
+            device=config.DEVICE,
             return_char_alignments=False,
         )
         transcript["segments"] = result_aligned["segments"]
@@ -76,6 +77,7 @@ def align_transcript(transcript: dict, wav_path: str, hf_token: str = "") -> dic
     del model_a
     flush_gpu()
 
-    print(f"  [stage3] Alignment model flushed. VRAM free: {vram_free_mb()}MB", flush=True)
+    if config.DEVICE != "cpu":
+        print(f"  [stage3] Alignment model flushed. VRAM free: {vram_free_mb()}MB", flush=True)
 
     return transcript

@@ -4,7 +4,7 @@ Uses WhisperX's DiarizationPipeline (pyannote-audio under the hood) to
 identify speakers and assign word-level speaker labels.
 """
 from gpu import flush_gpu, vram_free_mb
-from config import DEVICE
+import config
 
 
 def diarize_transcript(transcript: dict, wav_path: str, hf_token: str) -> dict:
@@ -20,7 +20,7 @@ def diarize_transcript(transcript: dict, wav_path: str, hf_token: str) -> dict:
     try:
         pipeline = DiarizationPipeline(
             token=hf_token,
-            device=DEVICE,
+            device=config.DEVICE,
         )
     except Exception as e:
         print(f"  [stage4] Failed to load diarization pipeline: {e}", flush=True)
@@ -51,6 +51,7 @@ def diarize_transcript(transcript: dict, wav_path: str, hf_token: str) -> dict:
     del pipeline
     flush_gpu()
 
-    print(f"  [stage4] Diarization model flushed. VRAM free: {vram_free_mb()}MB", flush=True)
+    if config.DEVICE != "cpu":
+        print(f"  [stage4] Diarization model flushed. VRAM free: {vram_free_mb()}MB", flush=True)
 
     return transcript

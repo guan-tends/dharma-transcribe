@@ -4,7 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from config import WHISPER_MODEL, COMPUTE_TYPE, BATCH_SIZE, DEVICE
+import config
+from config import WHISPER_MODEL, COMPUTE_TYPE, BATCH_SIZE
 from gpu import flush_gpu, vram_free_mb
 
 
@@ -16,11 +17,12 @@ def transcribe_audio(wav_path: str) -> Optional[dict]:
     import whisperx
 
     print(f"  [stage2] Loading WhisperX {WHISPER_MODEL} ({COMPUTE_TYPE})...", flush=True)
-    print(f"  [stage2] VRAM free: {vram_free_mb()}MB", flush=True)
+    if config.DEVICE != "cpu":
+        print(f"  [stage2] VRAM free: {vram_free_mb()}MB", flush=True)
 
     model = whisperx.load_model(
         WHISPER_MODEL,
-        device=DEVICE,
+        device=config.DEVICE,
         compute_type=COMPUTE_TYPE,
     )
 
@@ -48,7 +50,8 @@ def transcribe_audio(wav_path: str) -> Optional[dict]:
     del model
     flush_gpu()
 
-    print(f"  [stage2] ASR model flushed. VRAM free: {vram_free_mb()}MB", flush=True)
+    if config.DEVICE != "cpu":
+        print(f"  [stage2] ASR model flushed. VRAM free: {vram_free_mb()}MB", flush=True)
 
     return {
         "language": language,

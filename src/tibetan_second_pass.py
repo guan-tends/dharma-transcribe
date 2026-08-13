@@ -4,7 +4,8 @@ import torch
 import numpy as np
 from typing import List
 from gpu import flush_gpu, vram_free_mb
-from config import TIBETAN_MODEL_HF, DEVICE
+import config
+from config import TIBETAN_MODEL_HF
 
 
 def _slice_audio(wav_path: str, start: float, end: float) -> np.ndarray:
@@ -45,10 +46,11 @@ def tibetan_second_pass(transcript: dict, wav_path: str) -> dict:
     )
     model = WhisperForConditionalGeneration.from_pretrained(
         TIBETAN_MODEL_HF,
-    ).to(DEVICE)
+    ).to(config.DEVICE)
 
     model.eval()
-    print(f"  [stage5] Model loaded. VRAM free: {vram_free_mb()}MB", flush=True)
+    if config.DEVICE != "cpu":
+        print(f"  [stage5] Model loaded. VRAM free: {vram_free_mb()}MB", flush=True)
 
     corrections_made = 0
 
@@ -64,7 +66,7 @@ def tibetan_second_pass(transcript: dict, wav_path: str) -> dict:
                 audio_slice,
                 sampling_rate=16000,
                 return_tensors="pt",
-            ).input_features.to(DEVICE)
+            ).input_features.to(config.DEVICE)
 
             with torch.no_grad():
                 predicted_ids = model.generate(
@@ -109,7 +111,8 @@ def tibetan_second_pass(transcript: dict, wav_path: str) -> dict:
     del model
     del processor
     flush_gpu()
-    print(f"  [stage5] Tibetan model flushed. VRAM free: {vram_free_mb()}MB", flush=True)
+    if config.DEVICE != "cpu":
+        print(f"  [stage5] Tibetan model flushed. VRAM free: {vram_free_mb()}MB", flush=True)
 
     return transcript
 
