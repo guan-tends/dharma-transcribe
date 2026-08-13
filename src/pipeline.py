@@ -1,7 +1,16 @@
 """Main pipeline orchestrator — chains all 7 stages."""
-import json
 import sys
 import os
+
+# Force CPU mode before any torch/whisperx imports if --device cpu is on the CLI.
+# This must happen before ANY import that touches CUDA, otherwise PyTorch
+# initializes the GPU context even when models are later moved to CPU.
+if "--device" in sys.argv:
+    idx = sys.argv.index("--device")
+    if idx + 1 < len(sys.argv) and sys.argv[idx + 1] == "cpu":
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
+import json
 import time
 from datetime import datetime
 from pathlib import Path
@@ -131,7 +140,10 @@ def main():
     config.DEVICE = args.device
     print(f"Dharma Transcription Pipeline", flush=True)
     print(f"Device: {args.device}", flush=True)
-    print(f"GPU: {vram_total_mb()}MB total, {vram_free_mb()}MB free", flush=True)
+    if args.device == "cpu":
+        print(f"GPU: disabled (CPU mode)", flush=True)
+    else:
+        print(f"GPU: {vram_total_mb()}MB total, {vram_free_mb()}MB free", flush=True)
     print(f"LLM: {LLM_MODEL} via Synthetic API", flush=True)
     print(f"HF Token: {'provided' if args.hf_token else 'MISSING (diarization will be skipped)'}", flush=True)
 
