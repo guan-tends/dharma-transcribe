@@ -1,13 +1,11 @@
 """Stage 1: Ingest — extract audio from media files, compute metadata."""
+
 import hashlib
-import json
 import subprocess
-import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from config import FFMPEG_SR, FFMPEG_CHANNELS, FFMPEG_CODEC, MEDIA_EXTENSIONS, OUTPUT_DIR
+from .config import FFMPEG_CHANNELS, FFMPEG_CODEC, FFMPEG_SR, MEDIA_EXTENSIONS, OUTPUT_DIR
 
 
 def compute_checksum(filepath: Path) -> str:
@@ -23,9 +21,19 @@ def get_duration(filepath: Path) -> float:
     """Get media duration in seconds via ffprobe."""
     try:
         result = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(filepath)],
-            capture_output=True, text=True, timeout=30
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(filepath),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         return float(result.stdout.strip())
     except Exception:
@@ -35,17 +43,23 @@ def get_duration(filepath: Path) -> float:
 def extract_audio(input_path: Path, output_path: Path) -> bool:
     """Extract audio to 16kHz mono WAV via ffmpeg."""
     cmd = [
-        "ffmpeg", "-y", "-i", str(input_path),
-        "-ar", str(FFMPEG_SR),
-        "-ac", str(FFMPEG_CHANNELS),
-        "-c:a", FFMPEG_CODEC,
-        str(output_path)
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(input_path),
+        "-ar",
+        str(FFMPEG_SR),
+        "-ac",
+        str(FFMPEG_CHANNELS),
+        "-c:a",
+        FFMPEG_CODEC,
+        str(output_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
     return result.returncode == 0
 
 
-def ingest_file(media_path: Path) -> Optional[dict]:
+def ingest_file(media_path: Path) -> dict | None:
     """Process a single media file: checksum, extract audio, metadata."""
     if not media_path.exists():
         return None

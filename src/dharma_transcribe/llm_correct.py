@@ -1,48 +1,40 @@
-"""Stage 6: LLM post-correction via Synthetic.new (OpenAI-compatible API).
+"""Stage 6: LLM post-correction via OpenAI-compatible API.
 
-Uses gpt-oss-120b — returns content within token budget on Tibetan/Sanskrit
-segments (unlike reasoning-first models that exhaust tokens on thinking).
-Dynamic max_tokens via tiktoken estimation keeps us within model limits
-regardless of segment length.
+Works with any OpenAI-compatible endpoint: Synthetic.new, OpenAI, Ollama,
+vLLM, LM Studio, etc. Configure via DHARMA_LLM_API_URL, DHARMA_LLM_API_KEY,
+and DHARMA_LLM_MODEL environment variables.
+
+Uses dynamic token budgeting via tiktoken to stay within model context
+limits regardless of segment length.
 
 Token budgeting:
-  - gpt-oss-120b has 128k context window
-  - Estimate input tokens with tiktoken (cl100k_base approximation)
-  - max_tokens = min(generous_cap, context_window - estimated_input - margin)
-  - For a 5-hour lecture with 2000 segments at ~3s/segment: ~100 min total
+    - Estimate input tokens with tiktoken (cl100k_base approximation)
+    - max_tokens = min(generous_cap, context_window - estimated_input - margin)
 """
+
 import json
-import re
 import logging
+import re
+from urllib.parse import urlparse
 
 import tiktoken
 from openai import OpenAI
 
-from config import (
-    SYNTHETIC_API_URL,
-    SYNTHETIC_API_KEY,
-    LLM_MODEL,
-    LLM_CONFIDENCE_THRESHOLD,
-)
+from .config import LLM_API_KEY, LLM_API_URL, LLM_MODEL
 
 logger = logging.getLogger(__name__)
 
-# --- Constants ---------------------------------------------------------------
+# --- Constants -----------------------------------------------------------------
 
-MODEL_CONTEXT_WINDOW = 128_000  # gpt-oss-120b
-SAFETY_MARGIN = 2_048  # buffer between input + output and context limit
-DEFAULT_MAX_TOKENS = 4_096  # per-segment output cap (corrections are short)
-MAX_MAX_TOKENS = 8_192  # absolute cap per segment
+MODEL_CONTEXT_WINDOW = 128_000
+SAFETY_MARGIN = 2_048
+DEFAULT_MAX_TOKENS = 4_096
+MAX_MAX_TOKENS = 8_192
 
-# cl100k_base is a reasonable approximation for non-OpenAI models.
-# It overestimates slightly for non-Latin scripts, which is conservative.
 _ENCODER = tiktoken.get_encoding("cl100k_base")
 
-# --- System prompt ------------------------------------------------------------
+# --- System prompt -------------------------------------------------------------
 
-# Core instructions — lean by design. The dharma knowledge base is injected
-# as a separate user-context block only when relevant, not on every request.
-# This prevents reasoning models from spiraling on cross-referencing.
 SYSTEM_PROMPT = """\
 You are a correction engine for Buddhist dharma teaching transcripts.
 The transcripts contain English, Tibetan (bo), Sanskrit (sa), and occasionally Japanese (ja).
@@ -54,8 +46,6 @@ Return ONLY a JSON object:
 {"corrected": "...", "confidence": "high|low|none", "changes": ["was -> now", ...]}
 """
 
-# Dharma domain reference — sent as context, not as instructions.
-# This gives the model vocabulary without triggering exhaustive analysis.
 DHARMA_REFERENCE = """\
 Dharma vocabulary for reference:
 Teachers: Garchen Rinpoche, Chogyal Namkhai Norbu, Lama Fede Andino, Tenga Rinpoche, Karmapa
@@ -67,7 +57,8 @@ Regions: Amdo, Kham, Utsang
 """
 
 
-# --- Token estimation --------------------------------------------------------
+# --- Token estimation ---------------------------------------------------------
+
 
 def _estimate_tokens(text: str) -> int:
     """Estimate token count using cl100k_base encoding."""
@@ -86,23 +77,39 @@ def _compute_max_tokens(*texts: str) -> int:
     return max(min(available, DEFAULT_MAX_TOKENS), 512)
 
 
-# --- Client ------------------------------------------------------------------
+# --- Client -------------------------------------------------------------------
 
 _client: OpenAI | None = None
 
 
 def _get_client() -> OpenAI:
-    """Lazy singleton — avoids constructing client at import time."""
+    """Lazy singleton — avoids constructing client at import time.
+
+    Raises:
+        RuntimeError: If LLM_API_URL or LLM_API_KEY is not configured.
+    """
     global _client
     if _client is None:
-        _client = OpenAI(
-            base_url=SYNTHETIC_API_URL,
-            api_key=SYNTHETIC_API_KEY,
-        )
+        if not LLM_API_URL or not LLM_API_KEY:
+            raise RuntimeError(
+                "LLM correction requires DHARMA_LLM_API_URL and "
+                "DHARMA_LLM_API_KEY environment variables. "
+                "Use --skip-llm to disable this stage."
+            )
+        _client = OpenAI(base_url=LLM_API_URL, api_key=LLM_API_KEY)
     return _client
 
 
-# --- Core --------------------------------------------------------------------
+def _api_label() -> str:
+    """Extract a human-readable label from the API URL for metadata."""
+    if not LLM_API_URL:
+        return "none"
+    parsed = urlparse(LLM_API_URL)
+    return parsed.hostname or LLM_API_URL
+
+
+# --- Core ---------------------------------------------------------------------
+
 
 def _parse_json_response(content: str) -> dict | None:
     """Extract a JSON object from an LLM response.
@@ -125,7 +132,7 @@ def _parse_json_response(content: str) -> dict | None:
     if clean.endswith("```"):
         clean = clean[:-3].strip()
     # Greedy match for outermost JSON object
-    match = re.search(r'\{.*\}', clean, re.DOTALL)
+    match = re.search(r"\{.*\}", clean, re.DOTALL)
     if match:
         clean = match.group(0)
     try:
@@ -170,21 +177,28 @@ def correct_segment(
         )
     except Exception as e:
         logger.warning("API error on segment: %s", e)
-        return {"corrected": seg_text, "confidence": "none", "changes": [],
-                "error": str(e)}
+        return {"corrected": seg_text, "confidence": "none", "changes": [], "error": str(e)}
 
     msg = resp.choices[0].message
     content = msg.content
 
     if not content:
         finish = resp.choices[0].finish_reason
-        return {"corrected": seg_text, "confidence": "none", "changes": [],
-                "error": f"Empty content (finish={finish})"}
+        return {
+            "corrected": seg_text,
+            "confidence": "none",
+            "changes": [],
+            "error": f"Empty content (finish={finish})",
+        }
 
     result = _parse_json_response(content)
     if result is None:
-        return {"corrected": seg_text, "confidence": "none", "changes": [],
-                "error": f"JSON parse failed: {content[:200]}"}
+        return {
+            "corrected": seg_text,
+            "confidence": "none",
+            "changes": [],
+            "error": f"JSON parse failed: {content[:200]}",
+        }
 
     return result
 
@@ -200,12 +214,10 @@ def llm_correct_transcript(transcript: dict) -> dict:
     if not segments:
         return transcript
 
-    logger.info("Starting LLM correction with %s (%d segments)",
-                LLM_MODEL, len(segments))
-    print(f"  [stage6] LLM correction with {LLM_MODEL} ({len(segments)} segments)...",
-          flush=True)
+    logger.info("Starting LLM correction with %s (%d segments)", LLM_MODEL, len(segments))
+    print(f"  [stage6] LLM correction with {LLM_MODEL} ({len(segments)} segments)...", flush=True)
 
-    corrections_log = []
+    corrections_log: list[dict] = []
     high_conf = 0
     low_conf = 0
     errors = 0
@@ -230,33 +242,44 @@ def llm_correct_transcript(transcript: dict) -> dict:
             seg["llm_corrected"] = True
             seg["llm_confidence"] = confidence
             high_conf += 1
-            corrections_log.append({
-                "segment_id": i, "original": seg_text,
-                "corrected": corrected, "changes": changes,
-                "confidence": confidence,
-            })
+            corrections_log.append(
+                {
+                    "segment_id": i,
+                    "original": seg_text,
+                    "corrected": corrected,
+                    "changes": changes,
+                    "confidence": confidence,
+                }
+            )
         elif confidence == "low":
             seg["llm_suggestion"] = corrected
             seg["llm_confidence"] = confidence
             low_conf += 1
-            corrections_log.append({
-                "segment_id": i, "original": seg_text,
-                "suggested": corrected, "changes": changes,
-                "confidence": confidence,
-            })
+            corrections_log.append(
+                {
+                    "segment_id": i,
+                    "original": seg_text,
+                    "suggested": corrected,
+                    "changes": changes,
+                    "confidence": confidence,
+                }
+            )
         elif "error" in result:
             errors += 1
-            corrections_log.append({
-                "segment_id": i, "original": seg_text,
-                "error": result["error"],
-            })
+            corrections_log.append(
+                {
+                    "segment_id": i,
+                    "original": seg_text,
+                    "error": result["error"],
+                }
+            )
 
         if (i + 1) % 50 == 0:
             print(f"  [stage6] Processed {i + 1}/{len(segments)}...", flush=True)
 
     transcript["llm_correction"] = {
         "model": LLM_MODEL,
-        "api": "redacted",
+        "api": _api_label(),
         "segments_processed": len(segments),
         "high_confidence_corrections": high_conf,
         "low_confidence_suggestions": low_conf,
@@ -264,7 +287,8 @@ def llm_correct_transcript(transcript: dict) -> dict:
     }
     transcript["llm_corrections_log"] = corrections_log
 
-    print(f"  [stage6] Done: {high_conf} high-conf, {low_conf} low-conf, {errors} errors",
-          flush=True)
+    print(
+        f"  [stage6] Done: {high_conf} high-conf, {low_conf} low-conf, {errors} errors", flush=True
+    )
 
     return transcript

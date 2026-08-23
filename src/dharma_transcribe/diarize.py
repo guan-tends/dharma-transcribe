@@ -3,8 +3,9 @@
 Uses WhisperX's DiarizationPipeline (pyannote-audio under the hood) to
 identify speakers and assign word-level speaker labels.
 """
-from gpu import flush_gpu, vram_free_mb
-import config
+
+from . import config
+from .gpu import flush_gpu, vram_free_mb
 
 
 def diarize_transcript(transcript: dict, wav_path: str, hf_token: str) -> dict:

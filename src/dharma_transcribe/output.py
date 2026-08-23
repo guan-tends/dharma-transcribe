@@ -1,9 +1,19 @@
 """Stage 7: Multi-format output, corrections dictionary, review queue."""
+
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import List
-from config import JSON_DIR, SRT_DIR, VTT_DIR, TXT_DIR, REVIEW_DIR, CORRECTIONS_FILE, CONFIDENCE_THRESHOLD
+
+from .config import (
+    CORRECTIONS_DIR,
+    CONFIDENCE_THRESHOLD,
+    CORRECTIONS_FILE,
+    JSON_DIR,
+    REVIEW_DIR,
+    SRT_DIR,
+    TXT_DIR,
+    VTT_DIR,
+)
 
 
 def _format_timestamp(seconds: float) -> str:
@@ -129,25 +139,33 @@ def generate_review_queue(transcript: dict, source_name: str):
         llm_conf = seg.get("llm_confidence", "")
 
         if low_conf_words or llm_conf == "low":
-            review_items.append({
-                "segment_id": i,
-                "start": seg.get("start", 0),
-                "end": seg.get("end", 0),
-                "text": seg.get("text", ""),
-                "speaker": seg.get("speaker", ""),
-                "low_confidence_words": len(low_conf_words),
-                "llm_suggestion": seg.get("llm_suggestion", ""),
-                "llm_confidence": llm_conf,
-                "tibetan_second_pass": seg.get("tibetan_second_pass", False),
-            })
+            review_items.append(
+                {
+                    "segment_id": i,
+                    "start": seg.get("start", 0),
+                    "end": seg.get("end", 0),
+                    "text": seg.get("text", ""),
+                    "speaker": seg.get("speaker", ""),
+                    "low_confidence_words": len(low_conf_words),
+                    "llm_suggestion": seg.get("llm_suggestion", ""),
+                    "llm_confidence": llm_conf,
+                    "tibetan_second_pass": seg.get("tibetan_second_pass", False),
+                }
+            )
 
     if review_items:
         out_path = REVIEW_DIR / f"{Path(source_name).stem}_review.json"
-        out_path.write_text(json.dumps({
-            "source_file": source_name,
-            "review_items": review_items,
-            "generated_at": datetime.utcnow().isoformat() + "Z",
-        }, indent=2, ensure_ascii=False))
+        out_path.write_text(
+            json.dumps(
+                {
+                    "source_file": source_name,
+                    "review_items": review_items,
+                    "generated_at": datetime.utcnow().isoformat() + "Z",
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
         return out_path
     return None
 

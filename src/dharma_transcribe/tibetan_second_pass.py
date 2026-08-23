@@ -1,11 +1,12 @@
 """Stage 5: Tibetan second-pass transcription using OpenPecha model."""
-import torchaudio
-import torch
+
 import numpy as np
-from typing import List
-from gpu import flush_gpu, vram_free_mb
-import config
-from config import TIBETAN_MODEL_HF
+import torch
+import torchaudio
+
+from . import config
+from .config import TIBETAN_MODEL_HF
+from .gpu import flush_gpu, vram_free_mb
 
 
 def _slice_audio(wav_path: str, start: float, end: float) -> np.ndarray:
@@ -25,9 +26,9 @@ def tibetan_second_pass(transcript: dict, wav_path: str) -> dict:
 
     # Find Tibetan segments
     bo_segments = [
-        (i, seg) for i, seg in enumerate(transcript["segments"])
-        if seg.get("language", "") == "bo"
-        or _looks_tibetan(seg.get("text", ""))
+        (i, seg)
+        for i, seg in enumerate(transcript["segments"])
+        if seg.get("language", "") == "bo" or _looks_tibetan(seg.get("text", ""))
     ]
 
     if not bo_segments:
@@ -106,7 +107,10 @@ def tibetan_second_pass(transcript: dict, wav_path: str) -> dict:
         "corrections_made": corrections_made,
     }
 
-    print(f"  [stage5] Second pass complete: {corrections_made} corrections out of {len(bo_segments)} segments", flush=True)
+    print(
+        f"  [stage5] Second pass complete: {corrections_made} corrections out of {len(bo_segments)} segments",
+        flush=True,
+    )
 
     del model
     del processor

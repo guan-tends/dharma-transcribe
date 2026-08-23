@@ -1,15 +1,13 @@
 """Stage 2: Primary transcription via WhisperX large-v3."""
-import json
+
 from datetime import datetime
-from pathlib import Path
-from typing import Optional
 
-import config
-from config import WHISPER_MODEL, COMPUTE_TYPE, BATCH_SIZE
-from gpu import flush_gpu, vram_free_mb
+from . import config
+from .config import BATCH_SIZE, COMPUTE_TYPE, WHISPER_MODEL
+from .gpu import flush_gpu, vram_free_mb
 
 
-def transcribe_audio(wav_path: str) -> Optional[dict]:
+def transcribe_audio(wav_path: str) -> dict | None:
     """
     Transcribe audio file with WhisperX large-v3.
     Returns dict with segments, language info.
@@ -26,7 +24,7 @@ def transcribe_audio(wav_path: str) -> Optional[dict]:
         compute_type=COMPUTE_TYPE,
     )
 
-    print(f"  [stage2] Model loaded. Transcribing...", flush=True)
+    print("  [stage2] Model loaded. Transcribing...", flush=True)
 
     # Load audio
     audio = whisperx.load_audio(wav_path)
@@ -59,7 +57,7 @@ def transcribe_audio(wav_path: str) -> Optional[dict]:
     }
 
 
-def transcribe_with_metadata(wav_path: str, source_name: str) -> Optional[dict]:
+def transcribe_with_metadata(wav_path: str, source_name: str) -> dict | None:
     """Transcribe and wrap with metadata."""
     asr_result = transcribe_audio(wav_path)
     if asr_result is None:

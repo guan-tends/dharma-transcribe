@@ -1,10 +1,10 @@
 """Stage 3: Forced alignment via wav2vec2 per-language."""
-from typing import Optional
+
 import warnings
 
-import config
-from config import ALIGN_MODELS
-from gpu import flush_gpu, vram_free_mb
+from . import config
+from .config import ALIGN_MODELS
+from .gpu import flush_gpu, vram_free_mb
 
 
 def align_transcript(transcript: dict, wav_path: str, hf_token: str = "") -> dict:
@@ -37,7 +37,7 @@ def align_transcript(transcript: dict, wav_path: str, hf_token: str = "") -> dic
         print(f"  [stage3] Failed to load alignment model for '{language}': {e}", flush=True)
         return transcript
 
-    print(f"  [stage3] Aligning segments...", flush=True)
+    print("  [stage3] Aligning segments...", flush=True)
 
     try:
         result_aligned = whisperx.align(
@@ -66,7 +66,9 @@ def align_transcript(transcript: dict, wav_path: str, hf_token: str = "") -> dic
             "low_confidence_pct": round(low_conf_count / max(word_count, 1) * 100, 1),
         }
 
-        print(f"  [stage3] Aligned {word_count} words ({low_conf_count} low-confidence)", flush=True)
+        print(
+            f"  [stage3] Aligned {word_count} words ({low_conf_count} low-confidence)", flush=True
+        )
 
     except Exception as e:
         print(f"  [stage3] Alignment failed: {e}", flush=True)
