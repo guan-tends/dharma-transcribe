@@ -1,17 +1,10 @@
-# Core ASR
-whisperx
-torch
-torchaudio
-
-# HuggingFace model downloads
-transformers
-huggingface-hub
-
-# LLM correction (Ollama API client)
-requests
-
-# Audio processing (whisperx dep, but explicit)
-faster-whisper
-
-# Pyannote (whisperx dep)
-pyannote-audio
+# Core dependencies for dharma-transcribe
+# Install with: pip install -r requirements.txt
+# For dev dependencies: pip install -e ".[dev]"
+whisperx>=3.8.0
+torch>=2.0
+torchaudio>=2.0
+transformers>=4.40
+openai>=1.0
+tiktoken>=0.5
+requests>=2.28
