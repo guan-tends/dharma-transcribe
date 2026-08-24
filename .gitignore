@@ -17,3 +17,6 @@ tests/test_e2e_llm.py
 output/
 tests/test_e2e_llm.py
 tests/test_e2e_llm.py
+
+# Private scripts (not part of package)
+build_anki_deck.py
