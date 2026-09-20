@@ -3,12 +3,16 @@
 Uses WhisperX's DiarizationPipeline (pyannote-audio under the hood) to
 identify speakers and assign word-level speaker labels.
 
-The diarization pass runs in a SPAWNED SUBPROCESS guarded by a hard
-timeout. pyannote's attention pooling can produce zero-length sequences
-for certain audio segments, which triggers a std() warning and then hangs
-the process indefinitely (no crash, no error). Running it in a killable
-subprocess means a hang costs the timeout window instead of the whole
-run -- see the 21-hour Black Manjushri hang, 2026-08-23/24.
+Defence in depth
+----------------
+1. **Root cause fixed** — pyannote-audio's ``StatsPool`` divides by zero on
+   single-frame segments, yielding NaNs and an indefinite freeze
+   (pyannote/pyannote-audio#1861, fix PR #2047 still unmerged). The guard in
+   :mod:`dharma_transcribe.pyannote_compat` removes the trigger.
+2. **Watchdog** — the pass still runs in a spawned subprocess bounded by
+   ``config.DIARIZE_TIMEOUT_SEC``, so any *future* hang costs the timeout
+   window instead of the whole run (the 21-hour Black Manjushri hang,
+   2026-08-23/24, had no such bound).
 """
 
 import multiprocessing as mp
@@ -19,6 +23,10 @@ from .gpu import flush_gpu, vram_free_mb
 
 def _diarize_worker(wav_path: str, hf_token: str, device: str, queue) -> None:
     """Subprocess entry point: load pyannote and diarize ``wav_path``.
+
+    The ``StatsPool`` compatibility guard is applied BEFORE the pipeline is
+    constructed, because pyannote freezes on the first degenerate frame and
+    never recovers. See :mod:`dharma_transcribe.pyannote_compat`.
 
     The resulting DataFrame is placed on ``queue`` as ``("ok", df)``. Any
     exception is reported as ``("error", repr)`` so the parent can degrade
@@ -31,6 +39,11 @@ def _diarize_worker(wav_path: str, hf_token: str, device: str, queue) -> None:
         queue: Multiprocessing queue used to return the result.
     """
     try:
+        from .pyannote_compat import apply_patch
+
+        if apply_patch():
+            print("  [stage4] Applied StatsPool guard (pyannote#1861)", flush=True)
+
         from whisperx.diarize import DiarizationPipeline
 
         pipeline = DiarizationPipeline(token=hf_token, device=device)

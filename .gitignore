@@ -20,3 +20,6 @@ tests/test_e2e_llm.py
 
 # Private scripts (not part of package)
 build_anki_deck.py
+
+# Serena agent state (session memories, local project config)
+.serena/
