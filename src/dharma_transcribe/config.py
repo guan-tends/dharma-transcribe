@@ -92,6 +92,14 @@ MANIFEST_FILE = OUTPUT_DIR / "manifest.json"
 # Required for pyannote diarization and model downloads.
 HF_TOKEN_ENV = "HF_TOKEN"
 
+# --- Diarization watchdog -----------------------------------------------------
+
+# Hard timeout (seconds) for the Stage 4 diarization subprocess. pyannote can
+# hang indefinitely on zero-length attention-pooling segments (std() warning);
+# the subprocess is killed at this bound and the transcript is kept un-diarized.
+# Default 3600s gives ~2x headroom over a typical 2.4h-file diarization run.
+DIARIZE_TIMEOUT_SEC = int(os.environ.get("DHARMA_DIARIZE_TIMEOUT", "3600"))
+
 # --- ffmpeg output settings ----------------------------------------------------
 
 FFMPEG_SR = 16000
