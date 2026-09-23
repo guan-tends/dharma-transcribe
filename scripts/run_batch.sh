@@ -49,7 +49,7 @@ source venv/bin/activate
 
 # --- Pre-flight ---------------------------------------------------------------
 # Downloads and diarization both need external reachability. A dropped default
-# route has silently broken download batches before (adder-route-guard should
+# route has silently broken download batches before (route-guard should
 # self-heal within ~2 min, but fail loudly rather than mysteriously).
 if [[ -z "$(ip route show default 2>/dev/null)" ]]; then
   echo "WARNING: no default route — model downloads may fail" >&2
